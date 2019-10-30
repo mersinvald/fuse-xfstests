@@ -49,6 +49,8 @@ if [[ $MYNAME == check-gocryptfs ]]; then
 elif [[ $MYNAME == check-loopback ]]; then
 	type loopback
 	export FSTYP=fuse.loopback
+elif [[ $MYNAME == check-fleetfs ]]; then
+	export FSTYP=fuse.fleetfs
 else
 	echo "unknown mode of operation: $MYNAME"
 	exit 1
@@ -58,4 +60,9 @@ SECONDS=0
 ./check "$@"
 RET=$?
 echo "Runtime was $SECONDS seconds, exit code $RET"
+
+# Clean up mounts
+umount ${R}/testdir > /dev/null 2>&1
+umount ${R}/scratchdir > /dev/null 2>&1
+
 exit $RET

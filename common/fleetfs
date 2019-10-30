@@ -1,0 +1,30 @@
+_fleetfs_mount()
+{
+	local server=$1
+	local mnt=$2
+
+	local mount_rec=`findmnt -rncv -S fleetfs -T $mnt -o SOURCE,TARGET`
+	if [ -n "$mount_rec" ]; then
+	    return 0
+	fi
+
+    fleetfs --server-ip-port "${server}" --mount-point "${mnt}" $FLEETFS_EXTRA_MOUNT_OPTIONS >> /code/logs/xfstests_mount.log 2>&1 &
+    local fuse_pid=$!
+    # Wait for mount to be ready
+	while ps -p "$fuse_pid" > /dev/null 2>&1; do
+        local mount_rec=`findmnt -rncv -S fleetfs -T $mnt -o SOURCE,TARGET`
+        if [ -n "$mount_rec" ]; then
+            return 0
+        fi
+        sleep 0.01
+	done
+
+	echo "Mounting FleetFS (pid=${fuse_pid}) at ${mnt} FAILED"
+    return 1
+}
+
+_check_fleetfs_filesystem()
+{
+    local server=$1
+    fleetfs --server-ip-port "${server}" --fsck > /dev/null 2>&1
+}
