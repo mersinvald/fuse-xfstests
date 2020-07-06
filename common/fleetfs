@@ -10,6 +10,7 @@ _fleetfs_mount()
 
     fleetfs --server-ip-port "${server}" --mount-point "${mnt}" $FLEETFS_EXTRA_MOUNT_OPTIONS >> /code/logs/xfstests_mount.log 2>&1 &
     local fuse_pid=$!
+    disown "${fuse_pid}"
     # Wait for mount to be ready
 	while ps -p "$fuse_pid" > /dev/null 2>&1; do
         local mount_rec=`findmnt -rncv -S fleetfs -T $mnt -o SOURCE,TARGET`
