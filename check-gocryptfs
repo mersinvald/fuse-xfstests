@@ -51,6 +51,8 @@ elif [[ $MYNAME == check-loopback ]]; then
 	export FSTYP=fuse.loopback
 elif [[ $MYNAME == check-fleetfs ]]; then
 	export FSTYP=fuse.fleetfs
+elif [[ $MYNAME == check-fuser ]]; then
+	export FSTYP=fuse.fuser
 else
 	echo "unknown mode of operation: $MYNAME"
 	exit 1

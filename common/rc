@@ -153,6 +153,9 @@ case "$FSTYP" in
     fuse.fleetfs)
 	 . ./common/fleetfs
 	 ;;
+    fuse.fuser)
+	 . ./common/fuser
+	 ;;
     overlay)
 	 . ./common/overlay
 	 ;;
@@ -344,6 +347,9 @@ _try_scratch_mount()
 	elif [ "$FSTYP" == "fuse.fleetfs" ]; then
 		_fleetfs_mount $SCRATCH_SERVER $SCRATCH_MNT $*
 		return $?
+	elif [ "$FSTYP" == "fuse.fuser" ]; then
+		_fuser_mount $SCRATCH_DEV $SCRATCH_MNT $*
+		return $?
 	elif [ "$FSTYP" == "fuse.loopback" ]; then
 		_gofuse_loopback_mount $SCRATCH_DEV $SCRATCH_MNT $*
 		return $?
@@ -363,7 +369,7 @@ _scratch_unmount()
 	overlay)
 		_overlay_scratch_unmount
 		;;
-	btrfs|fuse.gocryptfs|fuse.loopback|fuse.fleetfs)
+	btrfs|fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser)
 		$UMOUNT_PROG $SCRATCH_MNT
 		;;
 	*)
@@ -388,6 +394,9 @@ _scratch_remount()
         return 1
     elif [ "$FSTYP" == "fuse.fleetfs" ]; then
         echo "_scratch_remount: fuse.fleetfs does not support any options (wanted: '$opts')"
+        return 1
+    elif [ "$FSTYP" == "fuse.fuser" ]; then
+        echo "_scratch_remount: fuse.fuser does not support any options (wanted: '$opts')"
         return 1
     elif [ "$FSTYP" == "fuse.loopback" ]; then
         echo "_scratch_remount: fuse.loopback does not support any options (wanted: '$opts')"
@@ -453,6 +462,9 @@ _test_mount()
     elif [ "$FSTYP" == "fuse.fleetfs" ]; then
         _fleetfs_mount $TEST_SERVER $TEST_DIR $*
         return $?
+    elif [ "$FSTYP" == "fuse.fuser" ]; then
+        _fuser_mount $TEST_DEV $TEST_DIR $*
+        return $?
     elif [ "$FSTYP" == "fuse.loopback" ]; then
         _gofuse_loopback_mount $TEST_DEV $TEST_DIR $*
         return $?
@@ -465,7 +477,7 @@ _test_unmount()
 {
 	if [ "$FSTYP" == "overlay" ]; then
 		_overlay_test_unmount
-	elif [ "$FSTYP" == "fuse.gocryptfs" -o "$FSTYP" == "fuse.loopback" -o "$FSTYP" == "fuse.fleetfs" ]; then
+	elif [ "$FSTYP" == "fuse.gocryptfs" -o "$FSTYP" == "fuse.loopback" -o "$FSTYP" == "fuse.fleetfs" -o "$FSTYP" == "fuse.fuser" ]; then
 		$UMOUNT_PROG $TEST_DIR
 	else
 		$UMOUNT_PROG $TEST_DEV
@@ -767,7 +779,7 @@ _scratch_mkfs()
 		_scratch_mkfs_gofuse_loopback_sized 1G $SCRATCH_DEV
 		return $?
 		;;
-	nfs*|cifs|ceph|overlay|glusterfs|pvfs2|9p|virtiofs|fuse.fleetfs)
+	nfs*|cifs|ceph|overlay|glusterfs|pvfs2|9p|virtiofs|fuse.fleetfs|fuse.fuser)
 		# unable to re-create this fstyp, just remove all files in
 		# $SCRATCH_MNT to avoid EEXIST caused by the leftover files
 		# created in previous runs
@@ -1508,12 +1520,23 @@ _check_mounted_on()
 	local mnt=$4
 	local type=$5
 
+	local search_type=""
+
+	case "$type" in
+        fuse.fleetfs)
+        search_type="fleetfs"
+        ;;
+        fuse.fuser)
+        search_type="fuser"
+        ;;
+	esac
+
 	# find $dev as the source, and print result in "$dev $mnt" format
-	local mount_rec=`findmnt -rncv -S fleetfs -T $mnt -o SOURCE,TARGET`
+	local mount_rec=`findmnt -rncv -S $search_type -T $mnt -o SOURCE,TARGET`
 	[ -n "$mount_rec" ] || return 1 # 1 = not mounted
 
 	# if it's mounted, make sure its on $mnt
-	if [ "$mount_rec" != "fleetfs $mnt" ]; then
+	if [ "$mount_rec" != "$search_type $mnt" ]; then
 		echo "$devname=$dev is mounted but not on $mntname=$mnt - aborting"
 		echo "Already mounted result:"
 		echo $mount_rec
@@ -1530,7 +1553,7 @@ _check_mounted_on()
 _require_scratch_nocheck()
 {
     case "$FSTYP" in
-	fuse.gocryptfs|fuse.loopback|fuse.fleetfs)
+	fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser)
 		if [ ! -d "$SCRATCH_MNT" ]; then
 			_notrun "this test requires a directory for \$SCRATCH_MNT"
 		fi
@@ -1621,7 +1644,7 @@ _require_scratch_nocheck()
 		 ;;
     esac
 
-    _check_mounted_on SCRATCH_DEV $SCRATCH_DEV SCRATCH_MNT $SCRATCH_MNT
+    _check_mounted_on SCRATCH_DEV $SCRATCH_DEV SCRATCH_MNT $SCRATCH_MNT $FSTYP
     local err=$?
     [ $err -le 1 ] || exit 1
     if [ $err -eq 0 ]
@@ -1659,7 +1682,7 @@ _require_scratch_size()
 _require_test()
 {
     case "$FSTYP" in
-	fuse.gocryptfs|fuse.loopback|fuse.fleetfs)
+	fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser)
 		;;
 	glusterfs)
 		echo $TEST_DEV | egrep -q ":/?" > /dev/null 2>&1
@@ -1744,7 +1767,7 @@ _require_test()
 		 ;;
     esac
 
-    _check_mounted_on TEST_DEV $TEST_DEV TEST_DIR $TEST_DIR
+    _check_mounted_on TEST_DEV $TEST_DEV TEST_DIR $TEST_DIR $FSTYP
     local err=$?
     [ $err -le 1 ] || exit 1
     if [ $err -ne 0 ]
@@ -2659,7 +2682,7 @@ _mount_or_remount_rw()
 			return 0 # ok=0
 		fi
 	else
-		if [ "$FSTYP" == "fuse.gocryptfs" -o "$FSTYP" == "fuse.loopback" -o "$FSTYP" == "fuse.fleetfs" ]; then
+		if [ "$FSTYP" == "fuse.gocryptfs" -o "$FSTYP" == "fuse.loopback" -o "$FSTYP" == "fuse.fleetfs" -o "$FSTYP" == "fuse.fuser" ]; then
 			echo "$FSTYP does not support remounting"
 			return 0
 		fi
@@ -2776,6 +2799,9 @@ _check_test_fs()
     fuse.fleetfs)
 	_check_fleetfs_filesystem $TEST_SERVER
 	;;
+    fuse.fuser)
+	# no way to check consistency for fuser
+	;;
 	fuse.loopback)
 	# no way to check consistency for loopback
 	;;
@@ -2834,6 +2860,9 @@ _check_scratch_fs()
 	;;
     fuse.fleetfs)
 	_check_fleetfs_filesystem $SCRATCH_SERVER
+	;;
+	fuse.fuser)
+	# Don't know how to check a fuse.fuser filesystem, yet.
 	;;
 	fuse.loopback)
 	# Don't know how to check a fuse.loopback filesystem, yet.
@@ -3850,7 +3879,7 @@ init_rc()
 		# Sanity check that SCRATCH partition is not mounted at another
 		# mount point, because it is about to be unmounted and formatted.
 		# Another fs type for scratch is fine (bye bye old fs type).
-		_check_mounted_on SCRATCH_DEV $SCRATCH_DEV SCRATCH_MNT $SCRATCH_MNT
+		_check_mounted_on SCRATCH_DEV $SCRATCH_DEV SCRATCH_MNT $SCRATCH_MNT $FSTYP
 		[ $? -le 1 ] || exit 1
 	fi
 
