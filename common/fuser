@@ -2,13 +2,20 @@ _fuser_mount()
 {
 	local data_dir=$1
 	local mnt=$2
+	local suid="$4"
 
 	local mount_rec=`findmnt -rncv -S fuser -T $mnt -o SOURCE,TARGET`
 	if [ -n "$mount_rec" ]; then
 	    return 0
 	fi
 
-    fuser --data-dir "${data_dir}" --mount-point "${mnt}" $FUSER_EXTRA_MOUNT_OPTIONS >> /code/logs/xfstests_mount.log 2>&1 &
+    if [[ "${suid}" == "nosuid" ]]; then
+	    suid=""
+	else
+	    suid="--suid"
+	fi
+
+    fuser --data-dir "${data_dir}" --mount-point "${mnt}" ${suid} $FUSER_EXTRA_MOUNT_OPTIONS >> /code/logs/xfstests_mount.log 2>&1 &
     local fuse_pid=$!
     disown "${fuse_pid}"
     # Wait for mount to be ready
