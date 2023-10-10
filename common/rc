@@ -156,6 +156,9 @@ case "$FSTYP" in
     fuse.fuser)
 	 . ./common/fuser
 	 ;;
+	fuse.synkro)
+	 . ./common/synkro
+	 ;;
     overlay)
 	 . ./common/overlay
 	 ;;
@@ -350,6 +353,9 @@ _try_scratch_mount()
 	elif [ "$FSTYP" == "fuse.fuser" ]; then
 		_fuser_mount $SCRATCH_DEV $SCRATCH_MNT $*
 		return $?
+	elif [ "$FSTYP" == "fuse.synkro" ]; then
+		_synkro_mount $SCRATCH_DEV $SCRATCH_MNT $*
+		return $?
 	elif [ "$FSTYP" == "fuse.loopback" ]; then
 		_gofuse_loopback_mount $SCRATCH_DEV $SCRATCH_MNT $*
 		return $?
@@ -369,7 +375,7 @@ _scratch_unmount()
 	overlay)
 		_overlay_scratch_unmount
 		;;
-	btrfs|fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser)
+	btrfs|fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser|fuse.synkro)
 		$UMOUNT_PROG $SCRATCH_MNT
 		;;
 	*)
@@ -398,6 +404,9 @@ _scratch_remount()
     elif [ "$FSTYP" == "fuse.fuser" ]; then
         echo "_scratch_remount: fuse.fuser does not support any options (wanted: '$opts')"
         return 1
+	elif [ "$FSTYP" == "fuse.synkro" ]; then
+		echo "_scratch_remount: fuse.synkro does not support any options (wanted: '$opts')"
+		return 1
     elif [ "$FSTYP" == "fuse.loopback" ]; then
         echo "_scratch_remount: fuse.loopback does not support any options (wanted: '$opts')"
         return 1
@@ -465,6 +474,9 @@ _test_mount()
     elif [ "$FSTYP" == "fuse.fuser" ]; then
         _fuser_mount $TEST_DEV $TEST_DIR $*
         return $?
+	elif [ "$FSTYP" == "fuse.synkro" ]; then
+		_synkro_mount $TEST_DEV $TEST_DIR $*
+		return $?
     elif [ "$FSTYP" == "fuse.loopback" ]; then
         _gofuse_loopback_mount $TEST_DEV $TEST_DIR $*
         return $?
@@ -477,7 +489,7 @@ _test_unmount()
 {
 	if [ "$FSTYP" == "overlay" ]; then
 		_overlay_test_unmount
-	elif [ "$FSTYP" == "fuse.gocryptfs" -o "$FSTYP" == "fuse.loopback" -o "$FSTYP" == "fuse.fleetfs" -o "$FSTYP" == "fuse.fuser" ]; then
+	elif [ "$FSTYP" == "fuse.gocryptfs" -o "$FSTYP" == "fuse.loopback" -o "$FSTYP" == "fuse.fleetfs" -o "$FSTYP" == "fuse.fuser" -o "$FSTYP" == "fuse.synkro" ]; then
 		$UMOUNT_PROG $TEST_DIR
 	else
 		$UMOUNT_PROG $TEST_DEV
@@ -779,7 +791,7 @@ _scratch_mkfs()
 		_scratch_mkfs_gofuse_loopback_sized 1G $SCRATCH_DEV
 		return $?
 		;;
-	nfs*|cifs|ceph|overlay|glusterfs|pvfs2|9p|virtiofs|fuse.fleetfs|fuse.fuser)
+	nfs*|cifs|ceph|overlay|glusterfs|pvfs2|9p|virtiofs|fuse.fleetfs|fuse.fuser|fuse.synkro)
 		# unable to re-create this fstyp, just remove all files in
 		# $SCRATCH_MNT to avoid EEXIST caused by the leftover files
 		# created in previous runs
@@ -1529,6 +1541,9 @@ _check_mounted_on()
         fuse.fuser)
         search_type="fuser"
         ;;
+		fuse.synkro)
+		search_type="synkro"
+		;;
 	esac
 
 	# find $dev as the source, and print result in "$dev $mnt" format
@@ -1553,7 +1568,7 @@ _check_mounted_on()
 _require_scratch_nocheck()
 {
     case "$FSTYP" in
-	fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser)
+	fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser|fuse.synkro)
 		if [ ! -d "$SCRATCH_MNT" ]; then
 			_notrun "this test requires a directory for \$SCRATCH_MNT"
 		fi
@@ -1682,7 +1697,7 @@ _require_scratch_size()
 _require_test()
 {
     case "$FSTYP" in
-	fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser)
+	fuse.gocryptfs|fuse.loopback|fuse.fleetfs|fuse.fuser|fuse.synkro)
 		;;
 	glusterfs)
 		echo $TEST_DEV | egrep -q ":/?" > /dev/null 2>&1
@@ -2682,7 +2697,7 @@ _mount_or_remount_rw()
 			return 0 # ok=0
 		fi
 	else
-		if [ "$FSTYP" == "fuse.gocryptfs" -o "$FSTYP" == "fuse.loopback" -o "$FSTYP" == "fuse.fleetfs" -o "$FSTYP" == "fuse.fuser" ]; then
+		if [ "$FSTYP" == "fuse.gocryptfs" -o "$FSTYP" == "fuse.loopback" -o "$FSTYP" == "fuse.fleetfs" -o "$FSTYP" == "fuse.fuser" -o "$FSTYP" == "fuse.synkro" ]; then
 			echo "$FSTYP does not support remounting"
 			return 0
 		fi
@@ -2802,6 +2817,9 @@ _check_test_fs()
     fuse.fuser)
 	# no way to check consistency for fuser
 	;;
+	fuse.synkro)
+	# no way to check consistency for fuser
+	;;
 	fuse.loopback)
 	# no way to check consistency for loopback
 	;;
@@ -2862,6 +2880,9 @@ _check_scratch_fs()
 	_check_fleetfs_filesystem $SCRATCH_SERVER
 	;;
 	fuse.fuser)
+	# Don't know how to check a fuse.fuser filesystem, yet.
+	;;
+	fuse.synkro)
 	# Don't know how to check a fuse.fuser filesystem, yet.
 	;;
 	fuse.loopback)

@@ -53,6 +53,8 @@ elif [[ $MYNAME == check-fleetfs ]]; then
 	export FSTYP=fuse.fleetfs
 elif [[ $MYNAME == check-fuser ]]; then
 	export FSTYP=fuse.fuser
+elif [[ $MYNAME == check-synkro ]]; then
+	export FSTYP=fuse.synkro
 else
 	echo "unknown mode of operation: $MYNAME"
 	exit 1

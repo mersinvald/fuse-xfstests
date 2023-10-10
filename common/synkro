@@ -1,0 +1,40 @@
+_synkro_mount()
+{
+	local data_dir=$1
+	local mnt=$2
+	local suid="$4"
+
+	local mount_rec=`findmnt -rncv -S synkro -T $mnt -o SOURCE,TARGET`
+	if [ -n "$mount_rec" ]; then
+	    return 0
+	fi
+
+    if [[ "${suid}" == "nosuid" ]]; then
+	    suid=""
+	else
+	    suid="--suid"
+	fi
+
+    mkdir -p "${data_dir}/remote"
+    cat <<EOF > "${data_dir}/config.yaml"
+remote: 
+  type: filesystem
+  mountpoint: ${data_dir}/remote
+  mount: false
+EOF
+
+    synkro -c "${data_dir}/config.yaml" -d "${data_dir}" mount $SYNKRO_EXTRA_MOUNT_OPTIONS "${mnt}" >> /code/logs/xfstests_mount.log 2>&1 &
+    local fuse_pid=$!
+    disown "${fuse_pid}"
+    # Wait for mount to be ready
+	while ps -p "$fuse_pid" > /dev/null 2>&1; do
+        local mount_rec=`findmnt -rncv -S synkro -T $mnt -o SOURCE,TARGET`
+        if [ -n "$mount_rec" ]; then
+            return 0
+        fi
+        sleep 0.01
+	done
+
+	echo "Mounting Synkro (pid=${fuse_pid}) at ${mnt} FAILED"
+    return 1
+}
