@@ -23,7 +23,7 @@ remote:
   mount: false
 EOF
 
-    synkro -c "${data_dir}/config.yaml" -d "${data_dir}" mount $SYNKRO_EXTRA_MOUNT_OPTIONS "${mnt}" >> /code/logs/xfstests_mount.log 2>&1 &
+    synkro --ephemeral -c "${data_dir}/config.yaml" -d "${data_dir}" mount $SYNKRO_EXTRA_MOUNT_OPTIONS "${mnt}" >> /code/logs/xfstests_mount.log 2>&1 &
     local fuse_pid=$!
     disown "${fuse_pid}"
     # Wait for mount to be ready
